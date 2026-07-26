@@ -1,0 +1,16 @@
+[build]
+  publish = "frontend"
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# config.js holds the auto-updated tunnel URL — must never be cached.
+[[headers]]
+  for = "/config.js"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0, must-revalidate"

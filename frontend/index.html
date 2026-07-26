@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kingdomland Kids Daily Report</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <script>
+    (function() {
+      var stored = localStorage.getItem('theme');
+      var sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = stored || sys;
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">KINGDOMLAND<span class="muted"> KIDS</span></span>
+    </div>
+    <div class="brand-sub">Daily Report Generator</div>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">
+      <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+      <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
+  </header>
+
+  <main id="login-view" class="card">
+    <h2>Sign in</h2>
+    <p class="muted">Enter your name and the team password to continue.</p>
+    <label>Your name
+      <input id="user-name" type="text" autocomplete="name" placeholder="e.g. Jonathan" />
+    </label>
+    <label>Team password
+      <input id="team-pw" type="password" autocomplete="current-password" />
+    </label>
+    <details class="advanced">
+      <summary>Advanced — Worker URL</summary>
+      <label>Worker URL <span class="muted" style="text-transform:none;font-weight:400;">(auto-filled by launcher; override only if needed)</span>
+        <input id="worker-url" type="text" placeholder="https://xxxx.trycloudflare.com" />
+      </label>
+    </details>
+    <div class="row">
+      <button id="login-btn" class="primary">Sign in</button>
+    </div>
+    <p id="login-err" class="err"></p>
+  </main>
+
+  <main id="dash-view" class="card hidden">
+    <div class="dash-head">
+      <h2>Generate today's report</h2>
+      <span class="whoami">Signed in as <strong id="whoami-name"></strong> · <a href="#" id="switch-user">not you?</a></span>
+    </div>
+    <div class="row">
+      <button class="primary" data-scope="daily">Generate Daily Report</button>
+    </div>
+    <div id="status" class="status-pill"></div>
+
+    <section id="preview" class="hidden">
+      <div class="row gap">
+        <button id="copy-subject">Copy Subject</button>
+        <button id="copy-html">Copy HTML</button>
+        <button id="download-eml">Download .eml</button>
+      </div>
+      <h3>Preview</h3>
+      <div class="preview-wrap">
+        <div class="preview-header" id="preview-subject"></div>
+        <iframe id="preview-frame" title="Email preview"></iframe>
+      </div>
+      <div class="preview-footer">
+        <span id="generated-ago" class="status-pill"></span>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
