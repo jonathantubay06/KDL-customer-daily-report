@@ -19,14 +19,25 @@ const SEL = {
   // The sidebar ALSO has a "Videos" link (to /videos, a separate content-mgmt
   // page) — role=tab distinguishes the Analytics page's inner tab from it.
   videosTab: 'role=tab[name="Videos"]',
-  quickRangeMtd: 'button:has-text("MTD")',
+
+  // There's no built-in "All Time" quick-range (only 7D/30D/90D/MTD/YTD) —
+  // confirmed by dumping the DOM. Boss Dawg call (Slack, 2026-07-27): monthly
+  // video engagement is too low to be meaningful, and Jojo's follow-up call
+  // was to fix the custom range's start at Jan 1, 2026 rather than a rolling
+  // "start of year". Payment/revenue data in stripe.js stays MTD, unaffected.
+  startDateTrigger: 'button[data-slot="popover-trigger"]', // .nth(0) = From, .nth(1) = To
+  calendarPopover: '[role="dialog"][data-slot="popover-content"]',
+  prevMonthBtn: 'button[aria-label="Go to the Previous Month"]',
+  monthCaption: '.rdp-caption_label',
+  dayCell: (isoDate) => `td[data-day="${isoDate}"] button`,
+  RANGE_START_ISO: '2026-01-01',
+  RANGE_START_CAPTION: 'January 2026',
 
   // The whole "Video Performance" card — title + table + pagination footer —
   // scoped to the active tab panel so it can't match a stale/inactive tab.
   tableContainer: '[role="tabpanel"][data-state="active"] [data-slot="card"]',
   columnHeader: (label) => `th:has-text("${label}")`,
   sortIcon: (label) => `th:has-text("${label}") svg`,
-  nextPageBtn: 'button[aria-label="Next page"]',
 };
 
 const METRICS = ['Views', 'Completions', 'Completion Rate', 'Watch Time (Hours)'];
@@ -51,16 +62,16 @@ export async function fetchKingdomlandSection() {
     await page.locator(SEL.videosTab).first().click();
     await page.waitForLoadState('networkidle', { timeout: NAV_TIMEOUT }).catch(() => {});
 
-    // Set range to Month-to-Date
-    await page.locator(SEL.quickRangeMtd).first().click();
+    // Set the "From" date to the fixed Jan 1, 2026 start (see SEL comment)
+    await setStartDate(page);
     await page.waitForLoadState('networkidle', { timeout: NAV_TIMEOUT }).catch(() => {});
     await page.waitForTimeout(500);
 
-    if (DEBUG) await dump(page, 'debug-kingdomland-videos-mtd.html');
+    if (DEBUG) await dump(page, 'debug-kingdomland-videos-alltime.html');
 
     const metrics = {};
     for (const metric of METRICS) {
-      metrics[metric] = await captureMetricPages(page, metric);
+      metrics[metric] = [await captureMetricPage(page, metric)];
     }
 
     return { generatedAt: new Date().toISOString(), metrics };
@@ -111,6 +122,25 @@ async function login(page) {
   await page.waitForURL((u) => !/\/login/i.test(u.toString()), { timeout: NAV_TIMEOUT });
 }
 
+// The date-range control is two independent single-date popovers ("From"/
+// "To"), each a react-day-picker calendar with only Prev/Next-month nav (no
+// year jump, no typable input) — so reaching a fixed date means clicking
+// "Previous Month" until the caption matches, then clicking the day cell.
+async function setStartDate(page) {
+  await page.locator(SEL.startDateTrigger).first().click();
+  const popover = page.locator(SEL.calendarPopover).first();
+  await popover.waitFor({ state: 'visible', timeout: NAV_TIMEOUT });
+
+  for (let i = 0; i < 36; i++) {
+    const caption = await popover.locator(SEL.monthCaption).first().innerText();
+    if (caption.trim() === SEL.RANGE_START_CAPTION) break;
+    await popover.locator(SEL.prevMonthBtn).first().click();
+    await page.waitForTimeout(150);
+  }
+
+  await popover.locator(SEL.dayCell(SEL.RANGE_START_ISO)).first().click();
+}
+
 // Sorting/paginating re-renders the table (React remounts it), which can
 // detach the exact element Playwright resolved mid-action. Retrying with a
 // short backoff absorbs that transient window instead of failing on it.
@@ -143,24 +173,11 @@ async function ensureSortedDescending(page, metric) {
   }
 }
 
-async function captureMetricPages(page, metric) {
+// Boss Dawg call (Slack, 2026-07-27): 1 page (top 10) per category, not 3 —
+// the report should be one screenshot per metric, not a full pagination dump.
+async function captureMetricPage(page, metric) {
   await ensureSortedDescending(page, metric);
   await page.waitForTimeout(700); // let the re-render settle before touching the table
-
-  const images = [];
-  for (let pageNum = 1; pageNum <= 3; pageNum++) {
-    const buf = await screenshotWithRetry(page, SEL.tableContainer);
-    images.push(`data:image/png;base64,${buf.toString('base64')}`);
-
-    if (pageNum < 3) {
-      const next = page.locator(SEL.nextPageBtn).first();
-      if (await next.isEnabled().catch(() => false)) {
-        await next.click();
-        await page.waitForTimeout(700);
-      } else {
-        break; // fewer than 3 pages of data
-      }
-    }
-  }
-  return images;
+  const buf = await screenshotWithRetry(page, SEL.tableContainer);
+  return `data:image/png;base64,${buf.toString('base64')}`;
 }

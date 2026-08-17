@@ -52,7 +52,9 @@ function startWorker(attempt = 0) {
 function startTunnel(attempt = 0) {
   if (shuttingDown) return;
   log('launch', 'starting Cloudflare Quick Tunnel...');
-  let captured = false;
+  // No one-shot latch here: cloudflared can silently reconnect mid-session
+  // with a brand-new hostname (edge disconnect), and a latch would miss
+  // that — updateAndPush already no-ops when the URL hasn't changed.
   cf = spawn(CLOUDFLARED, ['tunnel', '--url', `http://localhost:${WORKER_PORT}`, '--no-autoupdate'], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -60,10 +62,8 @@ function startTunnel(attempt = 0) {
   const onData = (data) => {
     const s = data.toString();
     process.stdout.write(`[tunnel] ${s}`);
-    if (captured) return;
     const m = s.match(TUNNEL_URL_RE);
     if (m) {
-      captured = true;
       updateAndPush(m[1]).catch(err => log('launch', `update failed: ${err.message}`));
     }
   };
@@ -123,5 +123,25 @@ process.on('SIGTERM', shutdown);
 process.on('uncaughtException', (e) => log('launch', `uncaught exception (continuing): ${e && e.stack || e}`));
 process.on('unhandledRejection', (e) => log('launch', `unhandled rejection (continuing): ${e && e.stack || e}`));
 
+// ---------- self-heal deps ----------
+// If node_modules is missing (or dotenv specifically), reinstall deps before
+// starting the worker. Guards against the ERR_MODULE_NOT_FOUND crash loop that
+// happens when a machine's node_modules gets wiped or a repo is freshly cloned.
+async function ensureDeps() {
+  const fs = await import('node:fs');
+  const workerDir = path.join(ROOT, 'worker');
+  const hasDotenv = fs.existsSync(path.join(workerDir, 'node_modules', 'dotenv'));
+  if (hasDotenv) return;
+  log('launch', 'worker deps missing — running npm install...');
+  try {
+    execSync('npm install', { cwd: workerDir, stdio: 'inherit' });
+    log('launch', 'npm install complete.');
+  } catch (err) {
+    log('launch', `npm install failed (continuing anyway): ${err.message}`);
+  }
+}
+
+// ---------- go ----------
+await ensureDeps();
 startWorker();
 startTunnel();

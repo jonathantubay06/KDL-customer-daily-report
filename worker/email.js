@@ -134,12 +134,14 @@ export function buildHtmlEmail({ scope, report }) {
     </tr></table>
   ` : '';
 
-  const videoRangeLabel = stripe ? stripe.overview.rangeLabel : null;
+  // Video engagement is always All Time (Boss Dawg call, Slack 2026-07-27:
+  // monthly numbers are too low to be meaningful) — no date range shown
+  // since it doesn't apply here.
   const videoHtml = kingdomland ? `
-    ${section(`Kingdomland Kids — Video Analytics${videoRangeLabel ? ` (${videoRangeLabel})` : ' (MTD)'}`)}
+    ${section('Kingdomland Kids — Video Analytics — All Time')}
     ${Object.entries(kingdomland.metrics).map(([metric, images]) => `
       <h4 style="color:#1a1f36;margin:20px 0 6px;${FONT}">Top videos by ${escapeHtml(metric)}</h4>
-      ${images.map((uri, i) => img(uri, `${metric} — page ${i + 1}`, '900px')).join('')}
+      ${images.map((uri) => img(uri, `Top videos by ${metric}`, '900px')).join('')}
     `).join('')}
   ` : '';
 

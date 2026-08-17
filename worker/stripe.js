@@ -165,7 +165,10 @@ export async function fetchStripeSection() {
   if (!config.stripeSecretKey) {
     throw new Error('STRIPE_SECRET_KEY not set');
   }
-  const stripe = new Stripe(config.stripeSecretKey, { apiVersion: '2024-06-20' });
+  // maxNetworkRetries: the SDK auto-retries idempotent requests (everything
+  // here is a GET) with exponential backoff on 429/5xx instead of surfacing
+  // "Request rate limit exceeded" straight to the report generation.
+  const stripe = new Stripe(config.stripeSecretKey, { apiVersion: '2024-06-20', maxNetworkRetries: 3 });
 
   const now = new Date();
   const todayStart = startOfDayTz(now);
