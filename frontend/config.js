@@ -1,3 +1,3 @@
 // Default worker URL. Auto-updated by launch.js on each tunnel start.
 // Override per-session via the "Worker URL" field on the sign-in screen.
-window.__WORKER_URL__ = 'https://someone-consultant-libs-kelkoo.trycloudflare.com';
+window.__WORKER_URL__ = 'https://workout-terrain-dealtime-scenarios.trycloudflare.com';
