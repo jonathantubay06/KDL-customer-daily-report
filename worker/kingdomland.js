@@ -57,6 +57,16 @@ export async function fetchKingdomlandSection() {
   const ctx = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
 
+  // The dashboard renders a 403 from its analytics API as an empty table
+  // ("No videos found."), which would silently produce a blank report.
+  // Record any denied analytics call and fail loudly instead.
+  let deniedApi = null;
+  page.on('response', (res) => {
+    if (/\/api\/admin\/analytics\//.test(res.url()) && [401, 403].includes(res.status())) {
+      deniedApi ??= `${res.status()} ${new URL(res.url()).pathname}`;
+    }
+  });
+
   try {
     await login(page);
     await gotoAnalytics(page);
@@ -74,6 +84,10 @@ export async function fetchKingdomlandSection() {
     await page.waitForTimeout(500);
 
     if (DEBUG) await dump(page, 'debug-kingdomland-videos-alltime.html');
+
+    if (deniedApi) {
+      throw new Error(`Kingdomland analytics API denied access (${deniedApi}) — the KINGDOMLAND_EMAIL account lacks admin analytics permission`);
+    }
 
     const metrics = {};
     for (const metric of METRICS) {
