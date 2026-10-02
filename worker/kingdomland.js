@@ -19,6 +19,7 @@ const SEL = {
   // The sidebar ALSO has a "Videos" link (to /videos, a separate content-mgmt
   // page) — role=tab distinguishes the Analytics page's inner tab from it.
   videosTab: 'role=tab[name="Videos"]',
+  analyticsNav: 'a[href*="/analytics"]',
 
   // There's no built-in "All Time" quick-range (only 7D/30D/90D/MTD/YTD) —
   // confirmed by dumping the DOM. Boss Dawg call (Slack, 2026-07-27): monthly
@@ -53,7 +54,7 @@ export async function fetchKingdomlandSection() {
 
   try {
     await login(page);
-    await page.goto(`${config.kingdomlandUrl}/analytics`, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
+    await gotoAnalytics(page);
 
     // Dump right after landing on the page — before any fragile clicks —
     // so we always have a DOM snapshot even if a later selector fails.
@@ -83,6 +84,22 @@ export async function fetchKingdomlandSection() {
   } finally {
     await ctx.close();
     await browser.close();
+  }
+}
+
+// On go.kingdomlandkids.com the app can land/redirect on the /videos
+// content-management page instead of Analytics. That page has no metrics,
+// so never scrape it: fall back to the sidebar "Analytics" link, and fail
+// loudly if we still aren't on the Analytics page.
+async function gotoAnalytics(page) {
+  await page.goto(`${config.kingdomlandUrl}/analytics`, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
+  if (!/\/analytics/i.test(page.url())) {
+    await page.locator(SEL.analyticsNav).first().click({ timeout: NAV_TIMEOUT });
+    await page.waitForURL(/\/analytics/i, { timeout: NAV_TIMEOUT });
+    await page.waitForLoadState('networkidle', { timeout: NAV_TIMEOUT }).catch(() => {});
+  }
+  if (!/\/analytics/i.test(page.url())) {
+    throw new Error(`Expected the Analytics page but landed on ${page.url()}`);
   }
 }
 
