@@ -14,7 +14,9 @@ const NAV_TIMEOUT = 30_000;
 const SEL = {
   loginEmail: 'input[type="email"], input[name="email"]',
   loginPassword: 'input[type="password"]',
-  loginSubmit: 'button[type="submit"], button:has-text("Sign In"), button:has-text("Log In")',
+  // The login page also has a "Sign in with Google" SSO button, so match the
+  // form's submit button only (has-text would hit both).
+  loginSubmit: 'button[type="submit"]',
 
   // The sidebar ALSO has a "Videos" link (to /videos, a separate content-mgmt
   // page) — role=tab distinguishes the Analytics page's inner tab from it.
@@ -48,7 +50,10 @@ export async function fetchKingdomlandSection() {
     throw new Error('KINGDOMLAND_EMAIL / KINGDOMLAND_PASSWORD not set');
   }
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+  });
   const ctx = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
 
@@ -132,7 +137,7 @@ async function login(page) {
     await passwordEl.fill(config.kingdomlandPassword);
   }
 
-  await page.locator(SEL.loginSubmit).click();
+  await page.locator(SEL.loginSubmit).first().click();
 
   // Success = URL moves off /login. Give it the full nav timeout since this
   // also covers the app's own auth round-trip.

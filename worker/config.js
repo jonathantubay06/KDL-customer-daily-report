@@ -8,7 +8,7 @@ export const config = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
 
   // Kingdomland Kids analytics dashboard
-  kingdomlandUrl: process.env.KINGDOMLAND_URL || 'https://go.kingdomlandkids.com',
+  kingdomlandUrl: process.env.KINGDOMLAND_URL || 'https://dashboard.kingdomlandkids.com',
   kingdomlandEmail: process.env.KINGDOMLAND_EMAIL || '',
   kingdomlandPassword: process.env.KINGDOMLAND_PASSWORD || '',
 
