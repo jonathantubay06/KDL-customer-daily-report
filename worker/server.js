@@ -6,23 +6,47 @@ import { config } from './config.js';
 import { fetchStripeSection } from './stripe.js';
 import { fetchKingdomlandSection } from './kingdomland.js';
 import { buildHtmlEmail, buildEml, buildSubject } from './email.js';
-import { transactionLog, REPORT_TZ } from './request-log.js';
+import {
+  transactionLog, teamPasswordGuard, REPORT_TZ,
+  stashEml, emlRoute, wantsEmlOnDemand, checkImages, runExclusive,
+} from './ops.js';
 
+const TOOL = 'kdl';
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(cors({ origin: config.allowedOrigins, credentials: false }));
-// One log line per request (see request-log.js): UTC + Philippine time, user, timings, size, errors.
-app.use(transactionLog('kdl'));
+// One log line per request, alerts on failures (see ops.js).
+app.use(transactionLog(TOOL));
+const requireTeamPassword = teamPasswordGuard(TOOL, config.teamPassword);
 
-function requireTeamPassword(req, res, next) {
-  const token = req.headers['x-team-password'];
-  if (!token || token !== config.teamPassword) {
-    return res.status(401).json({ error: 'unauthorized' });
+// Large replies (screenshots): gzip when the client accepts it.
+function sendJson(req, res, obj) {
+  const payload = Buffer.from(JSON.stringify(obj));
+  res.set('Content-Type', 'application/json; charset=utf-8');
+  if (/gzip/.test(req.headers['accept-encoding'] || '')) {
+    res.set('Content-Encoding', 'gzip');
+    return res.send(gzipSync(payload));
   }
-  next();
+  return res.send(payload);
+}
+
+// Every dashboard screenshot inside the Kingdomland section, keyed by where it was found.
+function screenshotsOf(section) {
+  const found = {};
+  const walk = (value, path) => {
+    if (typeof value === 'string') {
+      if (value.startsWith('data:image')) found[path] = value;
+    } else if (value && typeof value === 'object') {
+      for (const [k, v] of Object.entries(value)) walk(v, path ? `${path}.${k}` : k);
+    }
+  };
+  walk(section?.metrics, 'metrics');
+  return found;
 }
 
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+app.get('/eml/:id', requireTeamPassword, emlRoute);
 
 app.post('/generate/:scope', requireTeamPassword, async (req, res) => {
   const scope = req.params.scope;
@@ -33,13 +57,15 @@ app.post('/generate/:scope', requireTeamPassword, async (req, res) => {
   const start = Date.now();
 
   try {
-    // Stripe (API) and Kingdomland (Playwright) are independent — run in parallel.
-    // Both use US Central (Stripe's own account timezone); see request-log.js.
-    const [stripeSection, kingdomlandSection] = await Promise.all([
+    // Stripe (API) and Kingdomland (Playwright) are independent: run in parallel.
+    // Both use US Central (Stripe's own account timezone); see ops.js.
+    // One report at a time per worker; a second request waits for the first.
+    const [stripeSection, kingdomlandSection] = await runExclusive(() => Promise.all([
       fetchStripeSection(),
       fetchKingdomlandSection(REPORT_TZ),
-    ]);
+    ]));
     req.ctx.buildMs = Date.now() - start;
+    req.ctx.warnings.push(...checkImages(screenshotsOf(kingdomlandSection)));
 
     const report = {
       generatedAt: new Date().toISOString(),
@@ -51,16 +77,14 @@ app.post('/generate/:scope', requireTeamPassword, async (req, res) => {
     const subject = buildSubject({ scope, report });
     const html = buildHtmlEmail({ scope, report });
     const eml = buildEml({ scope, report, html });
-
-    // Reply carries large inline screenshots: gzip it (only when the client accepts gzip) so it downloads faster.
-    const payload = Buffer.from(JSON.stringify({ scope, generatedAt: report.generatedAt, requestId: req.ctx.id, subject, html, eml }));
-    res.set('Content-Type', 'application/json; charset=utf-8');
-    if (/gzip/.test(req.headers['accept-encoding'] || '')) {
-      res.set('Content-Encoding', 'gzip');
-      res.send(gzipSync(payload));
+    const reply = { scope, generatedAt: report.generatedAt, requestId: req.ctx.id, warnings: req.ctx.warnings, subject, html };
+    if (wantsEmlOnDemand(req)) {
+      stashEml(req.ctx.id, eml);
+      reply.emlId = req.ctx.id;
     } else {
-      res.send(payload);
+      reply.eml = eml;
     }
+    sendJson(req, res, reply);
   } catch (err) {
     console.error(`[generate/${scope}] ${req.ctx.id} failed:`, err);
     req.ctx.buildMs = Date.now() - start;

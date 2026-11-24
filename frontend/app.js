@@ -109,8 +109,22 @@ els.copyHtml.addEventListener('click', async () => {
   }
 });
 
-els.downloadEml.addEventListener('click', () => {
-  if (!lastResult?.eml) return;
+els.downloadEml.addEventListener('click', async () => {
+  if (!lastResult) return;
+  // The worker keeps the .eml for 30 minutes and sends it only when asked (smaller, faster reports).
+  if (!lastResult.eml && lastResult.emlId) {
+    try {
+      const r = await fetch(`${getWorkerUrl()}/eml/${lastResult.emlId}`, {
+        headers: { 'X-Team-Password': teamPassword, 'X-User-Name': userName || 'Unknown' },
+      });
+      if (!r.ok) throw new Error(r.statusText);
+      lastResult.eml = (await r.json()).eml;
+    } catch {
+      setStatus(els.status, 'The download link expired after 30 minutes. Please generate the report again.', 'error');
+      return;
+    }
+  }
+  if (!lastResult.eml) return;
   const { filename, content } = lastResult.eml;
   const bytes = Uint8Array.from(atob(content), c => c.charCodeAt(0));
   const blob = new Blob([bytes], { type: 'message/rfc822' });
@@ -134,6 +148,8 @@ async function generate(scope) {
         'X-User-Name': userName || 'Unknown',
         // Only for the worker's log (debugging); report dates stay in US time.
         'X-User-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+        // Leave the .eml out of the reply (it repeats every screenshot); Download fetches it when clicked.
+        'X-Eml-On-Demand': '1',
         'Content-Type': 'application/json',
       },
       body: '{}',
@@ -216,7 +232,9 @@ function startGeneratedAgo(iso) {
 }
 
 function setStatus(el, html, kind) {
-  el.innerHTML = html;
+  // Error text can carry raw server output: show it as plain text, never as markup.
+  if (kind === 'error') el.textContent = html;
+  else el.innerHTML = html;
   el.classList.remove('success', 'error');
   if (kind) el.classList.add(kind);
 }

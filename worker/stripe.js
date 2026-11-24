@@ -9,6 +9,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 // whatever timezone the worker happens to run in. A day-boundary mismatch
 // here silently swaps "today" and "yesterday" and shifts the whole MTD
 // window — exactly the bug this fixes.
+// Fixed on purpose (not REPORT_TIMEZONE): it must match the Stripe account's own setting.
 const TIMEZONE = 'America/Chicago';
 
 function getZonedParts(date, timeZone = TIMEZONE) {

@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { fmtDateInTz, REPORT_TZ } from './request-log.js';
+import { fmtDateInTz, REPORT_TZ } from './ops.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({

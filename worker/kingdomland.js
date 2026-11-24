@@ -8,9 +8,9 @@ import { config } from './config.js';
 const DEBUG = process.env.DEBUG_DUMP === '1';
 const NAV_TIMEOUT = 30_000;
 
-// TODO: confirm every selector below against debug-kingdomland.html — these
-// are best-guess placeholders based on the screenshots, not yet verified
-// against the live DOM.
+// Selectors for the Kingdomland dashboard (in production since 2026-09). If the dashboard
+// changes and a screenshot comes out blank, the image-size check in ops.js alerts Jojo;
+// re-check the selectors against debug-kingdomland.html (written on every failure).
 const SEL = {
   loginEmail: 'input[type="email"], input[name="email"]',
   loginPassword: 'input[type="password"]',
@@ -49,10 +49,11 @@ export async function fetchKingdomlandSection(timeZone = 'America/Chicago') {
   }
 
   const browser = await chromium.launch({ headless: true });
-  const ctx = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 2, timezoneId: timeZone });
-  const page = await ctx.newPage();
-
+  let ctx;
+  let page;
   try {
+    ctx = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 2, timezoneId: timeZone });
+    page = await ctx.newPage();
     await login(page);
     await page.goto(`${config.kingdomlandUrl}/analytics`, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
 
@@ -82,8 +83,9 @@ export async function fetchKingdomlandSection(timeZone = 'America/Chicago') {
     await dump(page, 'debug-kingdomland-error.html').catch(() => {});
     throw err;
   } finally {
-    await ctx.close();
-    await browser.close();
+    // Always shut the browser, even if the context never opened.
+    await ctx?.close().catch(() => {});
+    await browser.close().catch(() => {});
   }
 }
 

@@ -1,6 +1,9 @@
 [build]
   publish = "frontend"
   command = ""
+  # Skip the build unless a served file changed. If Netlify has no earlier commit to compare with
+  # (first build, or that commit is not in the clone), build anyway instead of cancelling.
+  ignore = "git cat-file -e $CACHED_COMMIT_REF 2>/dev/null && git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- frontend netlify.toml"
 
 [[headers]]
   for = "/*"
