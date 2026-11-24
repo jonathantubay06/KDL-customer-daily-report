@@ -19,12 +19,8 @@ export const config = {
     daily: {
       to: splitList(process.env.REPORT_TO) || [],
       cc: splitList(process.env.REPORT_CC) || [],
-      subject: (date) => {
-        const d = new Date(date);
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `Kingdomland Kids Customers Daily Reporting - ${mm}/${dd}/${d.getFullYear()}`;
-      },
+      // date arrives already formatted as MM/DD/YYYY in US Central (email.js buildSubject).
+      subject: (date) => `Kingdomland Kids Customers Daily Reporting - ${date}`,
     },
   },
 

@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { fmtDateInTz, REPORT_TZ } from './request-log.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -6,11 +7,9 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function fmtDate(iso) {
-  const d = new Date(iso);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${mm}/${dd}/${d.getFullYear()}`;
+// Client-facing date: the report's US timezone, not the server's clock.
+function fmtDate(iso, timeZone = REPORT_TZ) {
+  return fmtDateInTz(iso, timeZone);
 }
 
 function money(n) {
@@ -96,7 +95,7 @@ function section(title) {
 }
 
 export function buildSubject({ scope, report }) {
-  return config.recipients[scope].subject(report.generatedAt);
+  return config.recipients[scope].subject(fmtDate(report.generatedAt, report.timeZone || REPORT_TZ));
 }
 
 export function buildHtmlEmail({ scope, report }) {

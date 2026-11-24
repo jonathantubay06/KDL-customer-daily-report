@@ -42,13 +42,14 @@ const SEL = {
 
 const METRICS = ['Views', 'Completions', 'Completion Rate', 'Watch Time (Hours)'];
 
-export async function fetchKingdomlandSection() {
+// timeZone: the clock the dashboard runs in, so "today" in its date range matches the US client.
+export async function fetchKingdomlandSection(timeZone = 'America/Chicago') {
   if (!config.kingdomlandEmail || !config.kingdomlandPassword) {
     throw new Error('KINGDOMLAND_EMAIL / KINGDOMLAND_PASSWORD not set');
   }
 
   const browser = await chromium.launch({ headless: true });
-  const ctx = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 2, timezoneId: timeZone });
   const page = await ctx.newPage();
 
   try {

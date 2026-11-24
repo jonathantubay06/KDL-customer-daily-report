@@ -132,6 +132,8 @@ async function generate(scope) {
       headers: {
         'X-Team-Password': teamPassword,
         'X-User-Name': userName || 'Unknown',
+        // Only for the worker's log (debugging); report dates stay in US time.
+        'X-User-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone || '',
         'Content-Type': 'application/json',
       },
       body: '{}',
@@ -146,7 +148,9 @@ async function generate(scope) {
     }
     if (!r.ok) {
       const t = await r.text();
-      throw new Error(t || r.statusText);
+      // The worker's log line carries the same id, so a failure can be matched to it.
+      const ref = r.headers.get('X-Request-Id');
+      throw new Error((t || r.statusText) + (ref ? ` (ref ${ref})` : ''));
     }
     lastResult = await r.json();
     els.previewFrame.srcdoc = lastResult.html;

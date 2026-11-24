@@ -45,3 +45,9 @@ Then from the repo root: `node launch.js` (or double-click `launch.bat`).
 v0 scaffold. Selectors in [`worker/kingdomland.js`](worker/kingdomland.js) are **best-guess placeholders** — the real login form and video-analytics table markup haven't been inspected yet. Set `DEBUG_DUMP=1` in `worker/.env`, run a Generate, and inspect the resulting `worker/debug-kingdomland.html` to pin down the real selectors (same process used for Intac and V3).
 
 The Stripe module (`worker/stripe.js`) is untested against a live account — needs a real restricted API key to verify the numbers and chart come out correctly.
+
+## Logs and time zones (since 2026-11-24)
+
+- Dates the client sees (report "today", ranges, email subject and body) use US Central (`REPORT_TIMEZONE`, default `America/Chicago`).
+- `worker/access.log` has one JSON line per request (not `/health`): `ts` (UTC), `logTime` (Philippine time, `LOG_TIMEZONE`), `id`, `status`, `event` (`finish` or `aborted`), `user`, `userTz`, scope/range, `buildMs`, `totalMs`, `bytes`, `gzip`, `ip`, `ua`, `error`. The same `id` comes back as the `X-Request-Id` header and in error messages as "(ref ...)". Code: `worker/request-log.js`.
+- On the VPS: `tail -f /opt/reporttools/<tool>/worker/access.log` or `journalctl -u report-<tool> -f`.
