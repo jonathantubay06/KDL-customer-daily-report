@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { appendFile } from 'node:fs/promises';
+import { gzipSync } from 'node:zlib';
 import { config } from './config.js';
 import { fetchStripeSection } from './stripe.js';
 import { fetchKingdomlandSection } from './kingdomland.js';
@@ -54,7 +55,15 @@ app.post('/generate/:scope', requireTeamPassword, async (req, res) => {
     const html = buildHtmlEmail({ scope, report });
     const eml = buildEml({ scope, report, html });
 
-    res.json({ scope, generatedAt: report.generatedAt, subject, html, eml });
+    // Reply carries large inline screenshots: gzip it (only when the client accepts gzip) so it downloads faster.
+    const payload = Buffer.from(JSON.stringify({ scope, generatedAt: report.generatedAt, subject, html, eml }));
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    if (/gzip/.test(req.headers['accept-encoding'] || '')) {
+      res.set('Content-Encoding', 'gzip');
+      res.send(gzipSync(payload));
+    } else {
+      res.send(payload);
+    }
     logUsage({ scope, user, ok: true, durationMs: Date.now() - start, ip, ua });
   } catch (err) {
     console.error(`[generate/${scope}] failed:`, err);
